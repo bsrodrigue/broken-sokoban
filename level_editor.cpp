@@ -1,15 +1,61 @@
 #include <cstdlib>
+#include <cstring>
 #include <raylib.h>
 
 #define WINDOW_HEIGHT 600
 #define WINDOW_WIDTH 600
 
-#define CELL_COUNT 15
+#define CELL_COUNT 5
 #define CELL_SIZE (int)(WINDOW_HEIGHT / CELL_COUNT)
 
 #define FPS 30
 
 #define GRID_SIZE CELL_COUNT
+
+//======== File Format =======//
+#define LEVEL_NAME_OFFSET 0
+#define LEVEL_NAME_SIZE 256
+#define LEVEL_DATA_OFFSET (LEVEL_NAME_SIZE)
+#define LEVEL_DATA_SIZE (GRID_SIZE * GRID_SIZE) * (sizeof(char))
+#define LEVEL_FILE_SIZE (LEVEL_NAME_SIZE + LEVEL_DATA_SIZE)
+
+void load_level_file(const char *name, int level[GRID_SIZE][GRID_SIZE]) {
+  int data_size = LEVEL_DATA_SIZE;
+  unsigned char *loaded_data = LoadFileData(name, &data_size);
+
+  char *data_section = (char *)(loaded_data + LEVEL_DATA_OFFSET);
+
+  for (int i = 0; i < GRID_SIZE; i++) {
+    for (int j = 0; j < GRID_SIZE; j++) {
+      level[i][j] = (int)*data_section;
+      data_section++;
+    }
+  }
+}
+
+void save_level_file(const char *name, int level[GRID_SIZE][GRID_SIZE]) {
+  char *data = (char *)malloc(1024);
+
+  strncpy((data + LEVEL_NAME_OFFSET), name, LEVEL_NAME_SIZE);
+
+  char *data_section = (data + LEVEL_DATA_OFFSET);
+
+  for (int i = 0; i < GRID_SIZE; i++) {
+    for (int j = 0; j < GRID_SIZE; j++) {
+      *data_section = (char)level[i][j];
+      data_section++;
+    }
+  }
+
+  if (!SaveFileData(name, data, LEVEL_FILE_SIZE)) {
+    TraceLog(LOG_ERROR, "Error while saving level data");
+    exit(EXIT_FAILURE);
+  }
+
+  TraceLog(LOG_INFO, "Level data saved with success");
+
+  free(data);
+}
 
 enum BlockTypes {
   EMPTY,
@@ -89,12 +135,7 @@ void handle_key_input(int pressed_key) {
     current_block_type = BOX;
     break;
   case KEY_S:
-    // Save
-    if (!SaveFileData("level.dat", level, sizeof(level))) {
-      TraceLog(LOG_ERROR, "Unable to save level.dat");
-      return;
-    }
-
+    save_level_file("level.dat", level);
     break;
   }
 }
@@ -104,17 +145,7 @@ int main(int argc, char *argv[]) {
 
   SetTargetFPS(FPS);
 
-  if (FileExists("level.dat")) {
-    TraceLog(LOG_INFO, "Load Level Data");
-
-    int *dataSize;
-    *dataSize = sizeof(level);
-
-    void *data = (void *)LoadFileData("level.dat", dataSize);
-  }
-
-  init_level(level, 0);
-
+  load_level_file("level.dat", level);
   init_block_colors();
 
   while (!WindowShouldClose()) {
