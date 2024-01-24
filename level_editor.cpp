@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <raylib.h>
@@ -5,7 +6,7 @@
 #define WINDOW_HEIGHT 600
 #define WINDOW_WIDTH 600
 
-#define CELL_COUNT 5
+#define CELL_COUNT 10
 #define CELL_SIZE (int)(WINDOW_HEIGHT / CELL_COUNT)
 
 #define FPS 30
@@ -22,6 +23,10 @@
 void load_level_file(const char *name, int level[GRID_SIZE][GRID_SIZE]) {
   int data_size = LEVEL_DATA_SIZE;
   unsigned char *loaded_data = LoadFileData(name, &data_size);
+
+  if (loaded_data == NULL) {
+    return;
+  }
 
   char *data_section = (char *)(loaded_data + LEVEL_DATA_OFFSET);
 
@@ -103,6 +108,8 @@ void draw_grid() {
   for (int i = 0; i < GRID_SIZE; i++) {
     for (int j = 0; j < GRID_SIZE; j++) {
       int code = level[i][j];
+      if (code == 0)
+        continue;
       Color color = block_colors[code];
       draw_cell(j, i, color);
     }
@@ -116,6 +123,19 @@ void click(int value) {
   int y = (int)(pos.y / CELL_SIZE);
 
   level[y][x] = value;
+}
+
+void hover() {
+  Vector2 pos = GetMousePosition();
+
+  int x = (int)(pos.x / CELL_SIZE);
+  int y = (int)(pos.y / CELL_SIZE);
+
+  printf("%d\n", level[y][x]);
+
+  if (level[y][x] == 0) {
+    draw_cell(x, y, LIGHTGRAY);
+  }
 }
 
 void render() { draw_grid(); }
@@ -150,7 +170,7 @@ int main(int argc, char *argv[]) {
 
   while (!WindowShouldClose()) {
     BeginDrawing();
-    ClearBackground(BLACK);
+    ClearBackground(WHITE);
 
     int pressed_key = GetKeyPressed();
 
@@ -163,6 +183,7 @@ int main(int argc, char *argv[]) {
     }
 
     render();
+    hover();
 
     EndDrawing();
   }
