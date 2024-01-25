@@ -84,27 +84,11 @@ BlockTypes current_block_type = WALL;
 
 int level[GRID_SIZE][GRID_SIZE];
 
-void init_level(int arr[GRID_SIZE][GRID_SIZE], int value) {
-  for (int i = 0; i < GRID_SIZE; i++) {
-    for (int j = 0; j < GRID_SIZE; j++) {
-      arr[i][j] = value;
-    }
-  }
-}
-
-void load_level(int arr[GRID_SIZE][GRID_SIZE], int dest[GRID_SIZE][GRID_SIZE]) {
-  for (int i = 0; i < GRID_SIZE; i++) {
-    for (int j = 0; j < GRID_SIZE; j++) {
-      dest[i][j] = arr[i][j];
-    }
-  }
-}
-
 void draw_cell(float x, float y, Color color) {
   DrawRectangle((x * CELL_SIZE), (y * CELL_SIZE), CELL_SIZE, CELL_SIZE, color);
 }
 
-void draw_grid() {
+void draw_level() {
   for (int i = 0; i < GRID_SIZE; i++) {
     for (int j = 0; j < GRID_SIZE; j++) {
       int code = level[i][j];
@@ -136,7 +120,7 @@ void hover() {
   }
 }
 
-void render() { draw_grid(); }
+void render() { draw_level(); }
 
 void handle_key_input(int pressed_key) {
   switch (pressed_key) {
