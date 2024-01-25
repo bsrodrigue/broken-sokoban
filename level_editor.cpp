@@ -17,7 +17,7 @@
 #define LEVEL_NAME_OFFSET 0
 #define LEVEL_NAME_SIZE 256
 #define LEVEL_DATA_OFFSET (LEVEL_NAME_SIZE)
-#define LEVEL_DATA_SIZE (GRID_SIZE * GRID_SIZE) * (sizeof(char))
+#define LEVEL_DATA_SIZE (GRID_SIZE * GRID_SIZE) * (sizeof(int))
 #define LEVEL_FILE_SIZE (LEVEL_NAME_SIZE + LEVEL_DATA_SIZE)
 
 void load_level_file(const char *name, int level[GRID_SIZE][GRID_SIZE]) {
@@ -28,11 +28,11 @@ void load_level_file(const char *name, int level[GRID_SIZE][GRID_SIZE]) {
     return;
   }
 
-  char *data_section = (char *)(loaded_data + LEVEL_DATA_OFFSET);
+  int *data_section = (int *)(loaded_data + LEVEL_DATA_OFFSET);
 
   for (int i = 0; i < GRID_SIZE; i++) {
     for (int j = 0; j < GRID_SIZE; j++) {
-      level[i][j] = (int)*data_section;
+      level[i][j] = *data_section;
       data_section++;
     }
   }
@@ -43,11 +43,11 @@ void save_level_file(const char *name, int level[GRID_SIZE][GRID_SIZE]) {
 
   strncpy((data + LEVEL_NAME_OFFSET), name, LEVEL_NAME_SIZE);
 
-  char *data_section = (data + LEVEL_DATA_OFFSET);
+  int *data_section = (int *)(data + LEVEL_DATA_OFFSET);
 
   for (int i = 0; i < GRID_SIZE; i++) {
     for (int j = 0; j < GRID_SIZE; j++) {
-      *data_section = (char)level[i][j];
+      *data_section = level[i][j];
       data_section++;
     }
   }
@@ -130,8 +130,6 @@ void hover() {
 
   int x = (int)(pos.x / CELL_SIZE);
   int y = (int)(pos.y / CELL_SIZE);
-
-  printf("%d\n", level[y][x]);
 
   if (level[y][x] == 0) {
     draw_cell(x, y, LIGHTGRAY);
