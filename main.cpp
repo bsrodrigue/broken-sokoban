@@ -1,92 +1,212 @@
-#include <cstdint>
+#include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <raylib.h>
 #include <raymath.h>
+#include <vector>
 
-//-------------[Broken Sokoban]----------------------------//
-
-//-------------[Window]-------------//
-#define WINDOW_WIDTH 600
 #define WINDOW_HEIGHT 600
+#define WINDOW_WIDTH 600
 
-#define WINDOW_TITLE "Broken Sokoban"
+#define CELL_COUNT 10
+#define CELL_SIZE (int)(WINDOW_HEIGHT / CELL_COUNT)
 
-//-------------[Performance]-------------//
 #define FPS 30
 
-//-------------[Grid]-------------//
-#define CELL_COUNT 30
-#define CELL_SIZE WINDOW_WIDTH / CELL_COUNT
+#define GRID_SIZE CELL_COUNT
 
-#define GET_INGAME_POS(ABS_POS) ABS_POS *CELL_SIZE
+//======== File Format =======//
+#define LEVEL_NAME_OFFSET 0
+#define LEVEL_NAME_SIZE 256
+#define LEVEL_DATA_OFFSET (LEVEL_NAME_SIZE)
+#define LEVEL_DATA_SIZE (GRID_SIZE * GRID_SIZE) * (sizeof(int))
+#define LEVEL_FILE_SIZE (LEVEL_NAME_SIZE + LEVEL_DATA_SIZE)
 
-//-------------[Entities]-------------//
+void load_level_file(const char *name, int level[GRID_SIZE][GRID_SIZE]) {
+  int data_size = LEVEL_DATA_SIZE;
+  unsigned char *loaded_data = LoadFileData(name, &data_size);
 
-//-------------[RANDOM]-------------//
-#define RANDOM_SEED 0xBFA
+  if (loaded_data == NULL) {
+    return;
+  }
 
-namespace grid {
-void draw_cell(int x, int y, Color color = WHITE) {
-  DrawRectangle(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE, color);
+  int *data_section = (int *)(loaded_data + LEVEL_DATA_OFFSET);
+
+  for (int i = 0; i < GRID_SIZE; i++) {
+    for (int j = 0; j < GRID_SIZE; j++) {
+      level[i][j] = *data_section;
+      data_section++;
+    }
+  }
 }
-} // namespace grid
 
-Vector2 player_pos = {(float)CELL_COUNT / 2, CELL_COUNT - 5};
+enum BlockTypes {
+  EMPTY,
+  WALL,
+  PLAYER,
+  BOX,
+  TARGET,
+};
 
-void draw_level(Vector2 pos, uint8_t shape[3][3]) {
-  for (int i = 0; i < 3; i++) {
-    for (int j = 0; j < 3; j++) {
-      int cell = shape[i][j];
+Color block_colors[5];
 
-      if (cell != 0) {
-        grid::draw_cell(pos.x + j, pos.y + i);
+std::vector<Vector2> walls;
+Vector2 player;
+Vector2 box;
+Vector2 target;
+
+void init_block_colors() {
+  block_colors[EMPTY] = WHITE;
+  block_colors[WALL] = BLACK;
+  block_colors[PLAYER] = GRAY;
+  block_colors[BOX] = BLUE;
+  block_colors[TARGET] = RED;
+}
+
+int level[GRID_SIZE][GRID_SIZE];
+
+void draw_cell(float x, float y, Color color) {
+  DrawRectangle((x * CELL_SIZE), (y * CELL_SIZE), CELL_SIZE, CELL_SIZE, color);
+}
+
+void draw_walls() {
+  for (int i = 0; i < walls.size(); i++) {
+    Vector2 wall = walls[i];
+    draw_cell(wall.x, wall.y, block_colors[WALL]);
+  }
+}
+
+void draw_level() {
+  draw_walls();
+
+  draw_cell(player.x, player.y, block_colors[PLAYER]);
+  draw_cell(box.x, box.y, block_colors[BOX]);
+  draw_cell(target.x, target.y, block_colors[TARGET]);
+}
+
+void init_positions() {
+  for (int i = 0; i < GRID_SIZE; i++) {
+    for (int j = 0; j < GRID_SIZE; j++) {
+      float x = j;
+      float y = i;
+      int block_code = level[i][j];
+      switch (block_code) {
+      case EMPTY:
+        continue;
+        break;
+      case WALL:
+        walls.push_back({x, y});
+        break;
+      case PLAYER:
+        player = {x, y};
+        break;
+      case BOX:
+        box = {x, y};
+        break;
+      case TARGET:
+        target = {x, y};
+        break;
       }
     }
   }
 }
 
-bool check_out_of_bounds(Vector2 pos) { return false; }
+void render() { draw_level(); }
 
-void render() {}
-
-void update_pos() {}
-
-void get_player_input(int pressed_key) {}
-
-void game_loop() {
-  while (!WindowShouldClose()) {
-    BeginDrawing();
-    ClearBackground(BLACK);
-
-    int pressed_key = GetKeyPressed();
-    get_player_input(pressed_key);
-
-    render();
-    EndDrawing();
-  }
-}
-
-void init_game() {
-  InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, WINDOW_TITLE);
-
-  if (!IsWindowReady()) {
-    exit(EXIT_FAILURE);
+bool check_collision_with_walls(Vector2 next_pos) {
+  for (int i = 0; i < walls.size(); i++) {
+    Vector2 wall = walls[i];
+    if (Vector2Equals(wall, next_pos))
+      return true;
   }
 
-  HideCursor();
-
-  SetRandomSeed(RANDOM_SEED);
-
-  SetTargetFPS(FPS);
+  return false;
 }
 
-void close_game() {}
+bool check_collision_with_box(Vector2 next_pos) {
+  return Vector2Equals(box, next_pos);
+}
+
+bool check_collision_with_bounds(Vector2 next_pos) {
+  return (next_pos.x < 0 || next_pos.x > CELL_COUNT - 1 || next_pos.y < 0 ||
+          next_pos.y > CELL_COUNT - 1);
+}
+
+bool can_move_there(Vector2 next_pos) {
+  return !check_collision_with_walls(next_pos) &&
+         !check_collision_with_bounds(next_pos);
+}
+
+bool check_reached_target(Vector2 next_pos) {
+  return Vector2Equals(target, next_pos);
+}
+
+void handle_input(int pressed_key) {
+  Vector2 next = {0, 0};
+  Vector2 next_box = {0, 0};
+  switch (pressed_key) {
+  case KEY_UP:
+    next = Vector2Add(player, {0, -1});
+    next_box = Vector2Add(box, {0, -1});
+    break;
+  case KEY_DOWN:
+    next = Vector2Add(player, {0, 1});
+    next_box = Vector2Add(box, {0, 1});
+    break;
+  case KEY_LEFT:
+    next = Vector2Add(player, {-1, 0});
+    next_box = Vector2Add(box, {-1, 0});
+    break;
+  case KEY_RIGHT:
+    next = Vector2Add(player, {1, 0});
+    next_box = Vector2Add(box, {1, 0});
+    break;
+  }
+
+  if (Vector2Equals(next, {0, 0}))
+    return;
+
+  if (!can_move_there(next))
+    return;
+
+  if (!check_collision_with_box(next)) {
+    player = next;
+    return;
+  }
+
+  if (can_move_there(next_box)) {
+    if (check_reached_target(next_box)) {
+      CloseWindow();
+    }
+    box = next_box;
+    player = next;
+  }
+}
 
 int main(int argc, char *argv[]) {
-  init_game();
+  InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Broken Sokoban");
 
-  game_loop();
+  SetTargetFPS(FPS);
 
-  close_game();
+  load_level_file("level.dat", level);
+
+  init_block_colors();
+
+  init_positions();
+
+  while (!WindowShouldClose()) {
+    BeginDrawing();
+    ClearBackground(WHITE);
+
+    int pressed_key = GetKeyPressed();
+
+    handle_input(pressed_key);
+
+    render();
+
+    EndDrawing();
+  }
+
+  CloseWindow();
   return EXIT_SUCCESS;
 }
